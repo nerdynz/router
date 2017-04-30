@@ -6,17 +6,16 @@ import (
 
 	"github.com/go-zoo/bone"
 	"github.com/nerdynz/datastore"
+	flow "github.com/nerdynz/flow"
 	"github.com/nerdynz/security"
 	"github.com/nerdynz/view"
-	"github.com/unrolled/render"
 )
 
 // CustomRouter wraps gorilla mux with database, redis and renderer
 type CustomRouter struct {
 	// Router *mux.Router
-	Router   *bone.Mux
-	Renderer *render.Render
-	Store    *datastore.Datastore
+	Router *bone.Mux
+	Store  *datastore.Datastore
 }
 
 func New(store *datastore.Datastore) *CustomRouter {
@@ -90,10 +89,10 @@ func handler(store *datastore.Datastore, fn CustomHandlerFunc, authMethod string
 		// if we are at this point then we want a login
 		if loggedInUser != nil {
 			ctx := context.WithValue(req.Context(), "loggedInUser", loggedInUser)
-			fn(w, req.WithContext(ctx), store)
+			fn(flow.New(w, req.WithContext(ctx), store))
 			return
 		} else if authMethod == security.NoAuth {
-			fn(w, req, store)
+			fn(flow.New(w, req, store))
 			return
 		} else if err != nil {
 			// WE ONLY check the error after the above because if we aren't authenticating then we will get an error
@@ -111,4 +110,4 @@ func handler(store *datastore.Datastore, fn CustomHandlerFunc, authMethod string
 	}
 }
 
-type CustomHandlerFunc func(http.ResponseWriter, *http.Request, *datastore.Datastore)
+type CustomHandlerFunc func(context *flow.Context)
