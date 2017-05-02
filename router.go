@@ -3,7 +3,11 @@ package router
 import (
 	"context"
 	"net/http"
+	"os"
 
+	"io/ioutil"
+
+	"github.com/Sirupsen/logrus"
 	"github.com/go-zoo/bone"
 	"github.com/nerdynz/datastore"
 	flow "github.com/nerdynz/flow"
@@ -23,7 +27,6 @@ func New(store *datastore.Datastore) *CustomRouter {
 	r := bone.New()
 	r.CaseSensitive = false
 	r.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("./public/"))))
-	r.Handle("/webapp/", http.StripPrefix("/webapp/", http.FileServer(http.Dir("./webapp/js"))))
 	r.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets/"))))
 	r.Handle("/attachments/", http.StripPrefix("/attachments/", http.FileServer(http.Dir(store.Settings.AttachmentsFolder))))
 	customRouter.Router = r
@@ -32,6 +35,11 @@ func New(store *datastore.Datastore) *CustomRouter {
 }
 
 // GET - Get handler
+func (customRouter *CustomRouter) Application(route string, path string) *bone.Route {
+	//route = strings.ToLower(route)
+	return customRouter.Router.GetFunc(route, appHandler(path))
+}
+
 func (customRouter *CustomRouter) GET(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
 	return customRouter.Router.GetFunc(route, handler(customRouter.Store, routeFunc, securityType))
@@ -111,3 +119,21 @@ func handler(store *datastore.Datastore, fn CustomHandlerFunc, authMethod string
 }
 
 type CustomHandlerFunc func(context *flow.Context)
+
+func appHandler(file string) func(w http.ResponseWriter, req *http.Request) {
+	return func(w http.ResponseWriter, req *http.Request) {
+		fullpath, err := os.Getwd()
+		if err != nil {
+			view.JSON(w, http.StatusInternalServerError, err.Error())
+		}
+		fullpath += file
+		logrus.Info(fullpath)
+		data, err := ioutil.ReadFile(fullpath)
+		if err != nil {
+			view.JSON(w, http.StatusInternalServerError, err.Error())
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(data)
+	}
+}
