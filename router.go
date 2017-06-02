@@ -18,18 +18,18 @@ import (
 // CustomRouter wraps gorilla mux with database, redis and renderer
 type CustomRouter struct {
 	// Router *mux.Router
-	Router *bone.Mux
-	Store  *datastore.Datastore
+	Mux   *bone.Mux
+	Store *datastore.Datastore
 }
 
 func New(store *datastore.Datastore) *CustomRouter {
 	customRouter := &CustomRouter{}
 	r := bone.New()
-	r.CaseSensitive = false
-	r.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("./public/"))))
-	r.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets/"))))
-	r.Handle("/attachments/", http.StripPrefix("/attachments/", http.FileServer(http.Dir(store.Settings.AttachmentsFolder))))
-	customRouter.Router = r
+	// r.CaseSensitive = false
+	// r.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("./public/"))))
+	// r.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets/"))))
+	// r.Handle("/attachments/", http.StripPrefix("/attachments/", http.FileServer(http.Dir(store.Settings.AttachmentsFolder))))
+	customRouter.Mux = r
 	customRouter.Store = store
 	return customRouter
 }
@@ -37,57 +37,70 @@ func New(store *datastore.Datastore) *CustomRouter {
 // GET - Get handler
 func (customRouter *CustomRouter) Application(route string, path string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Router.GetFunc(route, appHandler(path))
+	return customRouter.Mux.GetFunc(route, appHandler(path))
 }
 
 func (customRouter *CustomRouter) GET(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Router.GetFunc(route, handler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.GetFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
 }
 
 // POST - Post handler
 func (customRouter *CustomRouter) POST(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Router.PostFunc(route, handler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.PostFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
 }
 
 // PST - Post handler with pst for tidier lines
 func (customRouter *CustomRouter) PST(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Router.PostFunc(route, handler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.PostFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
 }
 
 // PUT - Put handler
 func (customRouter *CustomRouter) PUT(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Router.PutFunc(route, handler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.PutFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
 }
 
 // PATCH - Patch handler
 func (customRouter *CustomRouter) PATCH(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Router.PatchFunc(route, handler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.PatchFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
 }
 
 // OPTIONS - Options handler
 func (customRouter *CustomRouter) OPTIONS(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Router.OptionsFunc(route, handler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.OptionsFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
 }
 
 // DELETE - Delete handler
 func (customRouter *CustomRouter) DELETE(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Router.DeleteFunc(route, handler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.DeleteFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
 }
 
 // DEL - Delete handler
 func (customRouter *CustomRouter) DEL(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Router.DeleteFunc(route, handler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.DeleteFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
 }
 
-func handler(store *datastore.Datastore, fn CustomHandlerFunc, authMethod string) http.HandlerFunc {
+func customHandler(store *datastore.Datastore, fn CustomHandlerFunc, authMethod string) http.HandlerFunc {
+	return authenticate(store, func(w http.ResponseWriter, req *http.Request) {
+		fn(flow.New(w, req, store))
+	}, authMethod)
+}
+
+// DefaultHandler wraps default http functions in auth it does not pass the data store to them
+func DefaultHandler(store *datastore.Datastore, fn http.HandlerFunc, authMethod string) http.HandlerFunc {
+	return authenticate(store, func(w http.ResponseWriter, req *http.Request) {
+		fn(w, req)
+	}, authMethod)
+}
+
+func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		padlock := security.New(req, store)
 
@@ -97,10 +110,10 @@ func handler(store *datastore.Datastore, fn CustomHandlerFunc, authMethod string
 		// if we are at this point then we want a login
 		if loggedInUser != nil {
 			ctx := context.WithValue(req.Context(), "loggedInUser", loggedInUser)
-			fn(flow.New(w, req.WithContext(ctx), store))
+			fn(w, req.WithContext(ctx))
 			return
 		} else if authMethod == security.NoAuth {
-			fn(flow.New(w, req, store))
+			fn(w, req)
 			return
 		} else if err != nil {
 			// WE ONLY check the error after the above because if we aren't authenticating then we will get an error
