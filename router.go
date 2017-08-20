@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strings"
 
 	"io/ioutil"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/go-zoo/bone"
 	"github.com/nerdynz/datastore"
 	flow "github.com/nerdynz/flow"
@@ -42,52 +42,52 @@ func (customRouter *CustomRouter) Application(route string, path string) *bone.R
 
 func (customRouter *CustomRouter) GET(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Mux.GetFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.GetFunc(route, customHandler("GET", customRouter.Store, routeFunc, securityType))
 }
 
 // POST - Post handler
 func (customRouter *CustomRouter) POST(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Mux.PostFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.PostFunc(route, customHandler("POST", customRouter.Store, routeFunc, securityType))
 }
 
 // PST - Post handler with pst for tidier lines
 func (customRouter *CustomRouter) PST(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Mux.PostFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.PostFunc(route, customHandler("POST", customRouter.Store, routeFunc, securityType))
 }
 
 // PUT - Put handler
 func (customRouter *CustomRouter) PUT(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Mux.PutFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.PutFunc(route, customHandler("PUT", customRouter.Store, routeFunc, securityType))
 }
 
 // PATCH - Patch handler
 func (customRouter *CustomRouter) PATCH(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Mux.PatchFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.PatchFunc(route, customHandler("PATCH", customRouter.Store, routeFunc, securityType))
 }
 
 // OPTIONS - Options handler
 func (customRouter *CustomRouter) OPTIONS(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Mux.OptionsFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.OptionsFunc(route, customHandler("OPTIONS", customRouter.Store, routeFunc, securityType))
 }
 
 // DELETE - Delete handler
 func (customRouter *CustomRouter) DELETE(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Mux.DeleteFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.DeleteFunc(route, customHandler("DELETE", customRouter.Store, routeFunc, securityType))
 }
 
 // DEL - Delete handler
 func (customRouter *CustomRouter) DEL(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Mux.DeleteFunc(route, customHandler(customRouter.Store, routeFunc, securityType))
+	return customRouter.Mux.DeleteFunc(route, customHandler("DELETE", customRouter.Store, routeFunc, securityType))
 }
 
-func customHandler(store *datastore.Datastore, fn CustomHandlerFunc, authMethod string) http.HandlerFunc {
+func customHandler(reqType string, store *datastore.Datastore, fn CustomHandlerFunc, authMethod string) http.HandlerFunc {
 	return authenticate(store, func(w http.ResponseWriter, req *http.Request) {
 		fn(flow.New(w, req, store))
 	}, authMethod)
@@ -102,6 +102,31 @@ func DefaultHandler(store *datastore.Datastore, fn http.HandlerFunc, authMethod 
 
 func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		// canonical host
+		if store.Settings.CanonicalURL != "" && store.Settings.ServerIsLVE { // set in ENV
+			root := strings.ToLower(req.URL.Host + req.URL.Path)
+			if !strings.HasSuffix(root, "/") {
+				root += "/"
+			}
+			if store.Settings.CanonicalURL != root {
+				redirectURL := store.Settings.CanonicalURL
+				if req.URL.RawQuery != "" {
+					redirectURL += "?" + req.URL.RawQuery
+				}
+				if req.URL.Fragment != "" {
+					redirectURL += "#" + req.URL.Fragment
+				}
+
+				http.Redirect(w, req, redirectURL, http.StatusMovedPermanently)
+				return
+			}
+		}
+
+		// CSRF
+		if store.Settings.CheckCSRFViaReferrer {
+
+		}
+
 		padlock := security.New(req, store)
 
 		// check for a logged in user. We always check this incase we need it
@@ -140,7 +165,7 @@ func appHandler(file string) func(w http.ResponseWriter, req *http.Request) {
 			view.JSON(w, http.StatusInternalServerError, err.Error())
 		}
 		fullpath += file
-		logrus.Info(fullpath)
+		// logrus.Info(fullpath)
 		data, err := ioutil.ReadFile(fullpath)
 		if err != nil {
 			view.JSON(w, http.StatusInternalServerError, err.Error())
