@@ -1,7 +1,6 @@
 package router
 
 import (
-	"context"
 	"net/http"
 	"os"
 	"strings"
@@ -123,21 +122,19 @@ func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod st
 		}
 
 		// CSRF
-		if store.Settings.CheckCSRFViaReferrer {
+		// if store.Settings.CheckCSRFViaReferrer {
 
+		// }
+
+		if authMethod == security.NoAuth {
+			fn(w, req)
+			return
 		}
 
-		padlock := security.New(req, store)
-
-		// check for a logged in user. We always check this incase we need it
-		loggedInUser, err := padlock.LoggedInUser()
-
 		// if we are at this point then we want a login
+		// check for a logged in user. We always check this incase we need it
+		loggedInUser, err := security.New(req, store).LoggedInUser()
 		if loggedInUser != nil {
-			ctx := context.WithValue(req.Context(), "loggedInUser", loggedInUser)
-			fn(w, req.WithContext(ctx))
-			return
-		} else if authMethod == security.NoAuth {
 			fn(w, req)
 			return
 		} else if err != nil {
