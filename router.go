@@ -139,7 +139,7 @@ func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod st
 			return
 		} else if err != nil {
 			// WE ONLY check the error after the above because if we aren't authenticating then we will get an error
-			view.JSON(w, http.StatusInternalServerError, err.Error())
+			view.JSON(w, http.StatusForbidden, err.Error())
 			return
 		}
 
