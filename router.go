@@ -131,17 +131,27 @@ func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod st
 			return
 		}
 
+		tableName := "person" // default
+		api := bone.GetValue(req, "api")
+		if api == "api" || api == "admin" {
+			// default - backwards compatibility
+			tableName = "person" // we already did this above, this is just for clarity. the default should ALWAYS BE person
+		} else {
+			tableName = api
+		}
+
 		// if we are at this point then we want a login
 		// check for a logged in user. We always check this incase we need it
-		loggedInUser, err := security.New(req, store).LoggedInUser()
-		if loggedInUser != nil {
+		loggedInUser, _ := security.New(req, store).LoggedInUser()
+		if loggedInUser != nil && loggedInUser.TableName == tableName { // we are in the correct section of the website
 			fn(w, req)
 			return
-		} else if err != nil {
-			// WE ONLY check the error after the above because if we aren't authenticating then we will get an error
-			view.JSON(w, http.StatusForbidden, err.Error())
-			return
 		}
+		// else if err != nil { // we dont care about the error
+		// 	// WE ONLY check the error after the above because if we aren't authenticating then we will get an error
+		// 	view.JSON(w, http.StatusForbidden, err.Error())
+		// 	return
+		// }
 
 		// if we have reached this point then the user doesn't have access
 		if authMethod == security.Disallow {
