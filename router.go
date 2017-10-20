@@ -7,6 +7,7 @@ import (
 
 	"io/ioutil"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/go-zoo/bone"
 	"github.com/nerdynz/datastore"
 	flow "github.com/nerdynz/flow"
@@ -110,12 +111,15 @@ func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod st
 			if store.Settings.CanonicalURL != root {
 				redirectURL := store.Settings.CanonicalURL
 				if req.URL.RawQuery != "" {
+					logrus.Info("1", redirectURL)
 					redirectURL += "?" + req.URL.RawQuery
 				}
 				if req.URL.Fragment != "" {
+					logrus.Info("2", redirectURL)
 					redirectURL += "#" + req.URL.Fragment
 				}
 
+				logrus.Info("3", redirectURL)
 				http.Redirect(w, req, redirectURL, http.StatusMovedPermanently)
 				return
 			}
