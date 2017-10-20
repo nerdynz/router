@@ -104,19 +104,33 @@ func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod st
 	return func(w http.ResponseWriter, req *http.Request) {
 		// canonical host
 		if store.Settings.CanonicalURL != "" && store.Settings.ServerIsLVE { // set in ENV
-			root := strings.ToLower(req.URL.Host + req.URL.Path)
+			canonical := store.Settings.CanonicalURL
+			root := strings.ToLower(req.Host)
 			if !strings.HasSuffix(root, "/") {
 				root += "/"
 			}
-			if store.Settings.CanonicalURL != root {
-				redirectURL := store.Settings.CanonicalURL
+			if !strings.HasSuffix(canonical, "/") {
+				canonical += "/"
+			}
+			// logrus.Info("root", root)
+			// logrus.Info("root", canonical)
+			if canonical != root {
+				redirectURL := "http://"
+				if store.Settings.IsSecured {
+					redirectURL = "https://"
+				}
+				redirectURL += strings.TrimRight(canonical, "/")
+				if req.URL.Path != "" {
+					redirectURL += req.URL.Path
+					// logrus.Info("0", redirectURL)
+				}
 				if req.URL.RawQuery != "" {
-					logrus.Info("1", redirectURL)
 					redirectURL += "?" + req.URL.RawQuery
+					// logrus.Info("2", redirectURL)
 				}
 				if req.URL.Fragment != "" {
-					logrus.Info("2", redirectURL)
 					redirectURL += "#" + req.URL.Fragment
+					// logrus.Info("2", redirectURL)
 				}
 
 				logrus.Info("3", redirectURL)
