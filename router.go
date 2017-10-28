@@ -133,7 +133,6 @@ func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod st
 					// logrus.Info("2", redirectURL)
 				}
 
-				logrus.Info("3", redirectURL)
 				http.Redirect(w, req, redirectURL, http.StatusMovedPermanently)
 				return
 			}
@@ -143,24 +142,30 @@ func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod st
 		// if store.Settings.CheckCSRFViaReferrer {
 
 		// }
+		logrus.Info("xx")
 
+		logrus.Info("method", authMethod)
 		if authMethod == security.NoAuth {
 			fn(w, req)
 			return
 		}
+		logrus.Info("yy")
 
 		tableName := "person" // default
 		api := bone.GetValue(req, "api")
 		if api == "api" || api == "admin" {
 			// default - backwards compatibility
 			tableName = "person" // we already did this above, this is just for clarity. the default should ALWAYS BE person
-		} else {
+		} else if api != "" {
 			tableName = api
 		}
 
 		// if we are at this point then we want a login
 		// check for a logged in user. We always check this incase we need it
-		loggedInUser, _ := security.New(req, store).LoggedInUser()
+		loggedInUser, err := security.New(req, store).LoggedInUser()
+		if err != nil {
+			logrus.Error("Something wrong with Auth", err)
+		}
 		if loggedInUser != nil && loggedInUser.TableName == tableName { // we are in the correct section of the website
 			fn(w, req)
 			return
