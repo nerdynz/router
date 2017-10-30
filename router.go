@@ -142,14 +142,10 @@ func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod st
 		// if store.Settings.CheckCSRFViaReferrer {
 
 		// }
-		logrus.Info("xx")
-
-		logrus.Info("method", authMethod)
 		if authMethod == security.NoAuth {
 			fn(w, req)
 			return
 		}
-		logrus.Info("yy")
 
 		tableName := "person" // default
 		api := bone.GetValue(req, "api")
