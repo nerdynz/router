@@ -26,9 +26,9 @@ func New(store *datastore.Datastore) *CustomRouter {
 	customRouter := &CustomRouter{}
 	r := bone.New()
 	r.CaseSensitive = false
-	r.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("./public/"))))
+	// r.Handle("/public/", http.StripPrefix("/public/", http.FileServer(http.Dir("./public/"))))
 	// r.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("./assets/"))))
-	r.Handle("/attachments/", http.StripPrefix("/attachments/", http.FileServer(http.Dir(store.Settings.AttachmentsFolder))))
+	// r.Handle("/attachments/", http.StripPrefix("/attachments/", http.FileServer(http.Dir(store.Settings.AttachmentsFolder))))
 	customRouter.Mux = r
 	customRouter.Store = store
 	return customRouter
