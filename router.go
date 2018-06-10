@@ -7,12 +7,12 @@ import (
 
 	"io/ioutil"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/go-zoo/bone"
 	"github.com/nerdynz/datastore"
 	flow "github.com/nerdynz/flow"
 	"github.com/nerdynz/security"
 	"github.com/nerdynz/view"
+	"github.com/sirupsen/logrus"
 )
 
 // CustomRouter wraps gorilla mux with database, redis and renderer
