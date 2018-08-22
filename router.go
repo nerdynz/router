@@ -160,7 +160,11 @@ func authenticate(store *datastore.Datastore, fn http.HandlerFunc, authMethod st
 		// check for a logged in user. We always check this incase we need it
 		loggedInUser, err := security.New(req, store).LoggedInUser()
 		if err != nil {
-			logrus.Error("Something wrong with Auth", err)
+			if err.Error() == "redis: nil" {
+				// ignore it, its expired from cache
+			} else {
+				logrus.Error("Something wrong with Auth", err)
+			}
 		}
 		if loggedInUser != nil && loggedInUser.TableName == tableName { // we are in the correct section of the website
 			fn(w, req)
