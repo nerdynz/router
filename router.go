@@ -5,13 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"io/ioutil"
-
 	"github.com/go-zoo/bone"
 	"github.com/nerdynz/datastore"
 	"github.com/nerdynz/flow"
 	"github.com/nerdynz/security"
-	"github.com/nerdynz/view"
 	"github.com/unrolled/render"
 )
 
@@ -48,7 +45,7 @@ func CustomAuth(renderer *render.Render, s *datastore.Datastore, key security.Ke
 // GET - Get handler
 func (customRouter *CustomRouter) Application(route string, path string) *bone.Route {
 	//route = strings.ToLower(route)
-	return customRouter.Mux.GetFunc(route, appHandler(path))
+	return customRouter.Mux.GetFunc(route, customRouter.appHandler(path))
 }
 
 func (customRouter *CustomRouter) GET(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
@@ -182,20 +179,14 @@ func authenticate(w http.ResponseWriter, req *http.Request, flw *flow.Flow, stor
 	}
 }
 
-func appHandler(file string) func(w http.ResponseWriter, req *http.Request) {
+func (customRouter *CustomRouter) appHandler(file string) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
+		flw := flow.New(w, req, customRouter.Renderer, customRouter.Store, customRouter.Key)
 		fullpath, err := os.Getwd()
 		if err != nil {
-			view.JSON(w, http.StatusInternalServerError, err.Error())
+			flw.ErrorJSON(http.StatusInternalServerError, "Failed to get current working directory", err)
 		}
 		fullpath += file
-		// logrus.Info(fullpath)
-		data, err := ioutil.ReadFile(fullpath)
-		if err != nil {
-			view.JSON(w, http.StatusInternalServerError, err.Error())
-		}
-
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(data)
+		flw.StaticFile(200, fullpath, "text/html; charset=utf-8")
 	}
 }
