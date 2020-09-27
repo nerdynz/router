@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-zoo/bone"
 	"github.com/nerdynz/datastore"
-	flow "github.com/nerdynz/flow"
+	"github.com/nerdynz/flow"
 	"github.com/nerdynz/security"
 	"github.com/nerdynz/view"
 	"github.com/unrolled/render"
@@ -22,10 +22,10 @@ type CustomRouter struct {
 	Renderer    *render.Render
 	Key         security.Key
 	Store       *datastore.Datastore
-	AuthHandler func(w http.ResponseWriter, req *http.Request, ctx *flow.Context, store *datastore.Datastore, fn CustomHandlerFunc, authMethod string)
+	AuthHandler func(w http.ResponseWriter, req *http.Request, flw *flow.Flow, store *datastore.Datastore, fn CustomHandlerFunc, authMethod string)
 }
 
-type CustomHandlerFunc func(w http.ResponseWriter, req *http.Request, ctx *flow.Context, store *datastore.Datastore)
+type CustomHandlerFunc func(w http.ResponseWriter, req *http.Request, flw *flow.Flow, store *datastore.Datastore)
 
 func New(renderer *render.Render, s *datastore.Datastore, key security.Key) *CustomRouter {
 	customRouter := &CustomRouter{}
@@ -39,7 +39,7 @@ func New(renderer *render.Render, s *datastore.Datastore, key security.Key) *Cus
 	return customRouter
 }
 
-func CustomAuth(renderer *render.Render, s *datastore.Datastore, key security.Key, authFn func(w http.ResponseWriter, req *http.Request, ctx *flow.Context, store *datastore.Datastore, fn CustomHandlerFunc, authMethod string)) *CustomRouter {
+func CustomAuth(renderer *render.Render, s *datastore.Datastore, key security.Key, authFn func(w http.ResponseWriter, req *http.Request, flw *flow.Flow, store *datastore.Datastore, fn CustomHandlerFunc, authMethod string)) *CustomRouter {
 	customRouter := New(renderer, s, key)
 	customRouter.AuthHandler = authFn
 	return customRouter
@@ -112,10 +112,10 @@ func (customRouter *CustomRouter) handler(reqType string, fn CustomHandlerFunc, 
 // 	}, authMethod)
 // }
 
-func authenticate(w http.ResponseWriter, req *http.Request, ctx *flow.Context, store *datastore.Datastore, fn CustomHandlerFunc, authMethod string) {
+func authenticate(w http.ResponseWriter, req *http.Request, flw *flow.Flow, store *datastore.Datastore, fn CustomHandlerFunc, authMethod string) {
 	// canonical host
-	canonical := ctx.Settings.Get("CANNONICAL_URL")
-	if canonical != "" && ctx.Settings.IsProduction() { // set in ENV
+	canonical := store.Settings.Get("CANNONICAL_URL")
+	if canonical != "" && store.Settings.IsProduction() { // set in ENV
 		root := strings.ToLower(req.Host)
 		if !strings.HasSuffix(root, "/") {
 			root += "/"
@@ -127,7 +127,7 @@ func authenticate(w http.ResponseWriter, req *http.Request, ctx *flow.Context, s
 		// logrus.Info("root", canonical)
 		if canonical != root {
 			redirectURL := "http://"
-			if ctx.Settings.GetBool("IS_HTTPS") {
+			if store.Settings.GetBool("IS_HTTPS") {
 				redirectURL = "https://"
 			}
 			redirectURL += strings.TrimRight(canonical, "/")
@@ -150,35 +150,35 @@ func authenticate(w http.ResponseWriter, req *http.Request, ctx *flow.Context, s
 	}
 
 	if authMethod == security.NoAuth {
-		fn(w, req, ctx, store)
+		fn(w, req, flw, store)
 		return
 	}
 
 	// if we are at this point then we want a login
-	loggedInUser, _, err := ctx.Padlock.LoggedInUser()
+	loggedInUser, _, err := flw.Padlock.LoggedInUser()
 	if err != nil {
 		if err.Error() == "redis: nil" {
 			// ignore it, its expired from cache
-			ctx.ErrorJSON(http.StatusForbidden, "Login Expired", err)
+			flw.ErrorJSON(http.StatusForbidden, "Login Expired", err)
 		} else {
-			ctx.ErrorJSON(http.StatusForbidden, "Auth Failure", err)
+			flw.ErrorJSON(http.StatusForbidden, "Auth Failure", err)
 		}
 		return
 	}
 
 	if loggedInUser != nil {
-		fn(w, req, ctx, store)
+		fn(w, req, flw, store)
 		return
 	}
 
 	// if we have reached this point then the user doesn't have access
 	if authMethod == security.Disallow {
-		ctx.ErrorJSON(http.StatusForbidden, "You're not currently logged in", err)
+		flw.ErrorJSON(http.StatusForbidden, "You're not currently logged in", err)
 		return
 
 	}
 	if authMethod == security.Redirect {
-		ctx.Redirect("/Login", http.StatusSeeOther)
+		flw.Redirect("/Login", http.StatusSeeOther)
 	}
 }
 
