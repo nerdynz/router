@@ -24,10 +24,10 @@ type CustomRouter struct {
 
 type CustomHandlerFunc func(w http.ResponseWriter, req *http.Request, flw *flow.Flow, store *datastore.Datastore)
 
-func New(renderer *render.Render, s *datastore.Datastore, key security.Key) *CustomRouter {
+func New(renderer *render.Render, s *datastore.Datastore, key security.Key, caseSensitive bool) *CustomRouter {
 	customRouter := &CustomRouter{}
 	r := bone.New()
-	r.CaseSensitive = false
+	r.CaseSensitive = caseSensitive
 	customRouter.Mux = r
 	customRouter.Store = s
 	customRouter.Key = key
@@ -37,7 +37,7 @@ func New(renderer *render.Render, s *datastore.Datastore, key security.Key) *Cus
 }
 
 func CustomAuth(renderer *render.Render, s *datastore.Datastore, key security.Key, authFn func(w http.ResponseWriter, req *http.Request, flw *flow.Flow, store *datastore.Datastore, fn CustomHandlerFunc, authMethod string)) *CustomRouter {
-	customRouter := New(renderer, s, key)
+	customRouter := New(renderer, s, key, true)
 	customRouter.AuthHandler = authFn
 	return customRouter
 }
@@ -55,6 +55,7 @@ func (customRouter *CustomRouter) GET(route string, routeFunc CustomHandlerFunc,
 
 // POST - Post handler
 func (customRouter *CustomRouter) POST(route string, routeFunc CustomHandlerFunc, securityType string) *bone.Route {
+
 	//route = strings.ToLower(route)
 	return customRouter.Mux.PostFunc(route, customRouter.handler("POST", routeFunc, securityType))
 }
@@ -98,6 +99,7 @@ func (customRouter *CustomRouter) DEL(route string, routeFunc CustomHandlerFunc,
 func (customRouter *CustomRouter) handler(reqType string, fn CustomHandlerFunc, authMethod string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		flow := flow.New(w, req, customRouter.Renderer, customRouter.Store, customRouter.Key)
+		req.ParseForm()
 		customRouter.AuthHandler(w, req, flow, customRouter.Store, fn, authMethod)
 	}
 }
